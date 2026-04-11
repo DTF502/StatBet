@@ -71,15 +71,15 @@ function setupCustomSelects() {
   });
 }
 
-function loadCountries() {
-  state.countries = window.StatBetData.api.getCountries();
+async function loadCountries() {
+  state.countries = await window.StatBetData.api.getCountries();
   fillSelect(controls.country, state.countries, "code", "name", "icon", "-- Selecciona un pais --");
   disableSelect(controls.league);
   disableSelect(controls.team);
   selectors.viewStatsBtn.disabled = true;
 }
 
-function onCountryChange() {
+async function onCountryChange() {
   state.selected.country = controls.country.selectedValue;
   state.selected.league = "";
   state.selected.team = "";
@@ -91,13 +91,13 @@ function onCountryChange() {
     return;
   }
 
-  state.leagues = window.StatBetData.api.getLeaguesByCountry(state.selected.country);
+  state.leagues = await window.StatBetData.api.getLeaguesByCountry(state.selected.country);
   fillSelect(controls.league, state.leagues, "id", "name", "icon", "-- Selecciona una liga --");
   disableSelect(controls.team);
   selectors.viewStatsBtn.disabled = true;
 }
 
-function onLeagueChange() {
+async function onLeagueChange() {
   state.selected.league = controls.league.selectedValue;
   state.selected.team = "";
 
@@ -107,7 +107,7 @@ function onLeagueChange() {
     return;
   }
 
-  state.teams = window.StatBetData.api.getTeamsByLeague(state.selected.league);
+  state.teams = await window.StatBetData.api.getTeamsByLeague(state.selected.league);
   fillSelect(controls.team, state.teams, "id", "name", "icon", "-- Selecciona un equipo --");
   selectors.viewStatsBtn.disabled = true;
 }
@@ -117,21 +117,21 @@ function onTeamChange() {
   selectors.viewStatsBtn.disabled = !state.selected.team;
 }
 
-function onTeamSearch() {
+async function onTeamSearch() {
   const query = selectors.teamSearch.value.trim();
   if (!query) return;
 
-  const match = window.StatBetData.api.searchTeam(query);
+  const match = await window.StatBetData.api.searchTeam(query);
   if (!match) {
     alert("No existe ningun equipo que coincida con esa busqueda.");
     return;
   }
 
   setSelectValue(controls.country, match.countryCode);
-  onCountryChange();
+  await onCountryChange();
 
   setSelectValue(controls.league, match.leagueId);
-  onLeagueChange();
+  await onLeagueChange();
 
   setSelectValue(controls.team, match.id);
   state.selected.team = match.id;

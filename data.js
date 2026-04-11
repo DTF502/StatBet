@@ -3,26 +3,120 @@
   const db = createMockDatabase();
 
   const api = {
-    getCountries() {
+    async getCountries() {
       return db.countries;
     },
-    getLeaguesByCountry(countryCode) {
+    async getLeaguesByCountry(countryCode) {
       return db.leagues.filter((league) => league.countryCode === countryCode);
     },
-    getTeamsByLeague(leagueId) {
+    async getTeamsByLeague(leagueId) {
+      if (leagueId === "la_liga") {
+        try {
+          const res = await fetch('backend/api.php?action=getTeams&league=140&season=2023');
+          const json = await res.json();
+          if (json.response) {
+            return json.response.map((item) => ({
+              id: item.team.id.toString(),
+              name: item.team.name,
+              leagueId: "la_liga",
+              countryCode: "ES",
+              icon: item.team.logo,
+            }));
+          }
+        } catch (e) {
+          console.error("Error API:", e);
+        }
+      }
       return db.teams.filter((team) => team.leagueId === leagueId);
     },
-    searchTeam(query) {
+    async searchTeam(query) {
       const normalized = normalize(query);
       return db.teams.find((team) => normalize(team.name).includes(normalized)) || null;
     },
-    getTeamById(teamId) {
+    async getTeamById(teamId) {
+      // Para id numéricos (API real), podemos hacer una petición o buscar en caché. 
+      // Por compatibilidad de la UI, buscaremos el mock team si no es numérico.
+      if (!isNaN(teamId) && teamId.trim() !== '') {
+        try {
+          const res = await fetch(`backend/api.php?action=getTeams&league=140&season=2023`);
+          const json = await res.json();
+          if (json.response) {
+            const t = json.response.find(item => item.team.id.toString() === teamId.toString());
+            if (t) {
+              return {
+                id: t.team.id.toString(),
+                name: t.team.name,
+                leagueId: "la_liga",
+                countryCode: "ES",
+                icon: t.team.logo
+              };
+            }
+          }
+        } catch(e) {}
+      }
       return db.teams.find((team) => team.id === teamId) || null;
     },
-    getLeagueById(leagueId) {
+    async getLeagueById(leagueId) {
       return db.leagues.find((league) => league.id === leagueId) || null;
     },
-    getTeamStats(teamId, context, competition) {
+    async getTeamStats(teamId, context, competition) {
+      if (!isNaN(teamId) && teamId.trim() !== '') {
+        try {
+          const res = await fetch(`backend/api.php?action=getTeamStats&league=140&season=2023&team=${teamId}`);
+          const json = await res.json();
+          const fixRes = await fetch(`backend/api.php?action=getTeamFixtures&league=140&season=2023&team=${teamId}`);
+          const fixJson = await fixRes.json();
+          
+          if (json.response && fixJson.response) {
+            const t = json.response;
+            const sourceStats = {
+              matches: t.fixtures.played.total,
+              goalsFor: t.goals.for.total.total,
+              goalsAgainst: t.goals.against.total.total,
+              cornersFor: 0, 
+              cornersAgainst: 0,
+              yellowCards: Object.values(t.cards.yellow || {}).reduce((acc, curr) => acc + (curr.total || 0), 0),
+              fouls: 0,
+            };
+            
+            const finishedMatches = fixJson.response.filter(
+              m => ["FT", "AET", "PEN"].includes(m.fixture.status.short)
+            );
+            const last5Matches = finishedMatches.slice(-5).reverse();
+            
+            const recentMatches = last5Matches.map(m => {
+              const dateObj = new Date(m.fixture.date);
+              const formattedDate = dateObj.toLocaleDateString("es-ES", { day: '2-digit', month: '2-digit', year: 'numeric' });
+              
+              const isHome = m.teams.home.id.toString() === teamId.toString();
+              return {
+                date: formattedDate,
+                competition: m.league.name,
+                opponent: isHome ? m.teams.away.name : m.teams.home.name,
+                homeAway: isHome ? "home" : "away",
+                score: `${m.goals.home}-${m.goals.away}`,
+                goalsFor: isHome ? m.goals.home : m.goals.away,
+                goalsAgainst: isHome ? m.goals.away : m.goals.home,
+                cornersFor: 0,
+                cornersAgainst: 0,
+                yellowCards: 0
+              };
+            });
+            
+            return {
+              teamName: t.team.name,
+              sourceStats,
+              recentMatches,
+              updatedAt: new Date().toISOString(),
+              competitions: [t.league.name]
+            };
+          }
+        } catch(e) {
+          console.error("Error API stats:", e);
+        }
+      }
+
+      // Mock database fallback
       const team = db.teamDetails[teamId];
       const teamInfo = db.teams.find((item) => item.id === teamId) || null;
       if (!team && !teamInfo) return null;

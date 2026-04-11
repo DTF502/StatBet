@@ -75,10 +75,10 @@ function destroyCharts() {
 }
 
 /* ── Init ────────────────────────────────────────────── */
-function init() {
+async function init() {
   if (!state.teamId) { window.location.href = "index.html"; return; }
 
-  const team = window.StatBetData.api.getTeamById(state.teamId);
+  const team = await window.StatBetData.api.getTeamById(state.teamId);
   if (!team) { window.location.href = "index.html"; return; }
 
   // Team logo
@@ -91,9 +91,9 @@ function init() {
   }
 
   sel.teamTitle.textContent = team.name;
-  populateCompetitionFilter();
+  await populateCompetitionFilter();
   bindEvents();
-  renderStats();
+  await renderStats();
 }
 
 function bindEvents() {
@@ -151,8 +151,8 @@ function clearDateError() {
   sel.dateError.classList.add("hidden");
 }
 
-function populateCompetitionFilter() {
-  const data = window.StatBetData.api.getTeamStats(state.teamId, "all", "all");
+async function populateCompetitionFilter() {
+  const data = await window.StatBetData.api.getTeamStats(state.teamId, "all", "all");
   const competitions = data?.competitions || [];
 
   sel.competition.innerHTML = "";
@@ -165,8 +165,8 @@ function populateCompetitionFilter() {
 }
 
 /* ── Render ──────────────────────────────────────────── */
-function renderStats() {
-  const payload = window.StatBetData.api.getTeamStats(state.teamId, state.context, state.competition);
+async function renderStats() {
+  const payload = await window.StatBetData.api.getTeamStats(state.teamId, state.context, state.competition);
   if (!payload) return;
 
   const filteredMatches = filterMatchesByDateRange(payload.recentMatches);
