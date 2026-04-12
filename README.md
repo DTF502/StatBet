@@ -18,3 +18,8 @@ El proyecto sigue un modelo Cliente-Servidor ligero:
 2. Consigue tu API Key de API-Football y reemplaza el fragmento indicativo en el archivo `backend/config.php`.
 3. Inicia tu servidor Apache.
 4. Entra desde tu navegador web a `http://localhost/StatBet/index.html`.
+
+## Avisos y Limitaciones de la API
+Al utilizar la versión gratuita (Free Tier) de **API-Football**, este proyecto presenta una serie de limitaciones a tener en cuenta:
+- **Límite de créditos diarios:** La clave de API gratuita solo permite 100 peticiones diarias. Si se excede este número, la aplicación dejará de cargar nuevas estadísticas hasta el día siguiente.
+- **Actualización de los datos:** Debido a las restricciones de la API gratuita, los datos obtenidos en la interfaz (como los partidos recientes o clasificaciones) no son actuales ni operan en estricto tiempo real, funcionando más como una prueba de concepto.
