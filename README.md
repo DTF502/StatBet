@@ -23,3 +23,12 @@ El proyecto sigue un modelo Cliente-Servidor ligero:
 Al utilizar la versión gratuita (Free Tier) de **API-Football**, este proyecto presenta una serie de limitaciones a tener en cuenta:
 - **Límite de créditos diarios:** La clave de API gratuita solo permite 100 peticiones diarias. Si se excede este número, la aplicación dejará de cargar nuevas estadísticas hasta el día siguiente.
 - **Actualización de los datos:** Debido a las restricciones de la API gratuita, los datos obtenidos en la interfaz (como los partidos recientes o clasificaciones) no son actuales ni operan en estricto tiempo real, funcionando más como una prueba de concepto.
+
+## Estrategia de Ramificación (GitFlow)
+Este proyecto adopta una estrategia de ramificación basada en **GitFlow** para mantener el código estructurado, seguro y simular un ciclo de desarrollo profesional moderno:
+
+1. **`main` (Master):** Contiene el código de producción estable y funcional. Cada entrega oficial se marca en esta rama con un Tag de versión.
+2. **`develop`:** Funciona como rama base o principal de integración. Todas las nuevas funciones probadas se combinan aquí antes de pasar a producción.
+3. **`feature/*`:** Ramas individuales y temporales de trabajo (por ejemplo `feature/api-integration` o `feature/ui-dashboard`). Cuando una nueva característica está completada y validada, se realiza un *Merge Request* hacia la rama `develop`.
+4. **`hotfix/*`:** Ramas de mantenimiento urgente creadas directamente desde `main` destinadas a subsanar de forma rápida algún problema crítico hallado en la versión publicada.
+5. **`release/*`:** Ramas transitorias preparativas de un nuevo despliegue en las que exclusivamente se corrigen defectos de última hora menores o se pule la documentación antes de fusionarse a `main`.
