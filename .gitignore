@@ -1,0 +1,8 @@
+# No subir CSV del dataset Kaggle
+data/kaggle/*
+!data/kaggle/.gitkeep
+!data/kaggle/README.md
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db

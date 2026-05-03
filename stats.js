@@ -43,7 +43,6 @@ const sel = {
   },
 };
 
-/* ── Chart config helpers ────────────────────────────── */
 const CHART_DEFAULTS = {
   responsive: true,
   maintainAspectRatio: true,
@@ -74,14 +73,12 @@ function destroyCharts() {
   state.charts = {};
 }
 
-/* ── Init ────────────────────────────────────────────── */
 async function init() {
   if (!state.teamId) { window.location.href = "index.html"; return; }
 
   const team = await window.StatBetData.api.getTeamById(state.teamId);
   if (!team) { window.location.href = "index.html"; return; }
 
-  // Team logo
   if (team.icon) {
     sel.teamLogo.src = team.icon;
     sel.teamLogo.alt = team.name;
@@ -143,39 +140,35 @@ function onCustomDateChange() {
   renderStats();
 }
 
-function showDateError() {
-  sel.dateError.classList.remove("hidden");
-}
-
-function clearDateError() {
-  sel.dateError.classList.add("hidden");
-}
+function showDateError() { sel.dateError.classList.remove("hidden"); }
+function clearDateError() { sel.dateError.classList.add("hidden"); }
 
 async function populateCompetitionFilter() {
   const data = await window.StatBetData.api.getTeamStats(state.teamId, "all", "all");
   const competitions = data?.competitions || [];
 
   sel.competition.innerHTML = "";
-  competitions.forEach((comp, i) => addOption(sel.competition, comp, comp, false, i === 0));
-  addOption(sel.competition, "all", "Todas las competiciones", false, competitions.length === 0);
+  addOption(sel.competition, "all", "Todas las competiciones", false, true);
+  competitions.forEach((comp) => addOption(sel.competition, comp, comp, false, false));
 
-  state.competition = competitions.length ? competitions[0] : "all";
+  state.competition = "all";
   sel.competition.value = state.competition;
   initializeCustomDates();
 }
 
-/* ── Render ──────────────────────────────────────────── */
 async function renderStats() {
   const payload = await window.StatBetData.api.getTeamStats(state.teamId, state.context, state.competition);
   if (!payload) return;
 
-  const filteredMatches = filterMatchesByDateRange(payload.recentMatches);
+  const allMatches = payload.recentMatches || [];
+  const filteredMatches = filterMatchesByDateRange(allMatches);
   const computedStats = computeStatsFromMatches(filteredMatches, payload.sourceStats);
+  const last5 = filteredMatches.slice(0, 5);
 
   renderKpis(computedStats, payload.updatedAt);
-  renderRecentMatches(filteredMatches);
-  renderMeta(payload.teamName);
-  renderCharts(filteredMatches, computedStats);
+  renderRecentMatches(last5);
+  renderMeta(payload.teamName, payload.season);
+  renderCharts(last5, computedStats);
 }
 
 function filterMatchesByDateRange(matches) {
@@ -201,39 +194,48 @@ function filterMatchesByDateRange(matches) {
     const matchDate = parseDate(m.date);
     return matchDate >= rangeStart && matchDate <= now;
   });
-
 }
 
 function parseDate(dateString) {
+  if (!dateString) return new Date(0);
+  if (dateString.includes("-")) return new Date(dateString);
   const [day, month, year] = dateString.split("/").map(Number);
   return new Date(year, month - 1, day);
 }
+
 function computeStatsFromMatches(matches, seasonStats) {
   if (!matches.length) {
-    return { matches: 0, goalsFor: 0, goalsAgainst: 0, cornersFor: 0, cornersAgainst: 0, yellowCards: 0, fouls: 0 };
+    return { matches: 0, goalsFor: 0, goalsAgainst: 0, cornersFor: null, cornersAgainst: null, yellowCards: 0, fouls: null };
   }
+
+  const cornersAvailable = matches.some((m) => m.cornersFor !== null && m.cornersFor !== undefined);
+  const foulsAvailable = matches.some((m) => m.fouls !== null && m.fouls !== undefined);
 
   return {
     matches: matches.length,
-    goalsFor: matches.reduce((sum, m) => sum + m.goalsFor, 0),
-    goalsAgainst: matches.reduce((sum, m) => sum + m.goalsAgainst, 0),
-    cornersFor: matches.reduce((sum, m) => sum + m.cornersFor, 0),
-    cornersAgainst: matches.reduce((sum, m) => sum + m.cornersAgainst, 0),
-    yellowCards: matches.reduce((sum, m) => sum + m.yellowCards, 0),
-    fouls: seasonStats.fouls,
+    goalsFor: sum(matches, "goalsFor"),
+    goalsAgainst: sum(matches, "goalsAgainst"),
+    cornersFor: cornersAvailable ? sum(matches, "cornersFor") : null,
+    cornersAgainst: cornersAvailable ? sum(matches, "cornersAgainst") : null,
+    yellowCards: sum(matches, "yellowCards"),
+    fouls: foulsAvailable ? sum(matches, "fouls") : null,
   };
+}
+
+function sum(matches, key) {
+  return matches.reduce((total, item) => total + (Number(item[key]) || 0), 0);
 }
 
 function renderKpis(stats, updatedAt) {
   const m = stats.matches || 1;
-  sel.stats.matches.textContent       = stats.matches;
-  sel.stats.goalsFor.textContent      = stats.goalsFor;
-  sel.stats.goalsAgainst.textContent  = stats.goalsAgainst;
-  sel.stats.cornersFor.textContent    = stats.cornersFor;
-  sel.stats.cornersAgainst.textContent = stats.cornersAgainst;
-  sel.stats.yellowCards.textContent   = stats.yellowCards;
-  sel.stats.fouls.textContent         = stats.fouls;
-  sel.stats.updatedAt.textContent     = window.StatBetData.helpers.formatDateTime(updatedAt);
+  sel.stats.matches.textContent        = stats.matches;
+  sel.stats.goalsFor.textContent       = displayValue(stats.goalsFor);
+  sel.stats.goalsAgainst.textContent   = displayValue(stats.goalsAgainst);
+  sel.stats.cornersFor.textContent     = displayValue(stats.cornersFor);
+  sel.stats.cornersAgainst.textContent = displayValue(stats.cornersAgainst);
+  sel.stats.yellowCards.textContent    = displayValue(stats.yellowCards);
+  sel.stats.fouls.textContent          = displayValue(stats.fouls);
+  sel.stats.updatedAt.textContent      = window.StatBetData.helpers.formatDateTime(updatedAt);
 
   sel.avg.goalsFor.textContent       = avg(stats.goalsFor, m) + " / partido";
   sel.avg.goalsAgainst.textContent   = avg(stats.goalsAgainst, m) + " / partido";
@@ -243,7 +245,12 @@ function renderKpis(stats, updatedAt) {
   sel.avg.fouls.textContent          = avg(stats.fouls, m) + " / partido";
 }
 
+function displayValue(value) {
+  return value === null || value === undefined || Number.isNaN(value) ? "N/D" : value;
+}
+
 function avg(value, matches) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "N/D";
   return matches > 0 ? (value / matches).toFixed(1) : "0.0";
 }
 
@@ -269,11 +276,16 @@ function renderRecentMatches(matches) {
       <td><span class="result-badge result-badge--${result}">${result}</span></td>
       <td class="score-cell">${match.score}</td>
       <td>${match.goalsFor}–${match.goalsAgainst}</td>
-      <td>${match.cornersFor}–${match.cornersAgainst}</td>
-      <td>${match.yellowCards}</td>
+      <td>${displayPair(match.cornersFor, match.cornersAgainst)}</td>
+      <td>${displayValue(match.yellowCards)}</td>
     `;
     sel.recentMatches.appendChild(row);
   });
+}
+
+function displayPair(a, b) {
+  if (a === null || a === undefined || b === null || b === undefined) return "N/D";
+  return `${a}–${b}`;
 }
 
 function getResult(goalsFor, goalsAgainst) {
@@ -282,13 +294,13 @@ function getResult(goalsFor, goalsAgainst) {
   return "D";
 }
 
-function renderMeta(teamName) {
+function renderMeta(teamName, season) {
   const ctxLabel = state.context === "all" ? "General" : state.context === "home" ? "Local" : "Visitante";
   const compLabel = state.competition === "all" ? "Todas las competiciones" : state.competition;
-  sel.statsMeta.textContent = `${ctxLabel} | ${compLabel}`;
+  const seasonLabel = season ? `Temporada ${season}/${String(Number(season) + 1).slice(-2)}` : "Última temporada";
+  sel.statsMeta.textContent = `${ctxLabel} | ${compLabel} | ${seasonLabel}`;
 }
 
-/* ── Charts ──────────────────────────────────────────── */
 function renderCharts(matches, seasonStats) {
   destroyCharts();
 
@@ -296,7 +308,6 @@ function renderCharts(matches, seasonStats) {
     ? matches.map((m) => m.opponent.length > 10 ? m.opponent.slice(0, 10) + "…" : m.opponent)
     : [];
 
-  // Goals per match
   state.charts.goals = makeBar(
     document.getElementById("chartGoals"),
     labels,
@@ -306,17 +317,15 @@ function renderCharts(matches, seasonStats) {
     ]
   );
 
-  // Corners per match
   state.charts.corners = makeBar(
     document.getElementById("chartCorners"),
     labels,
     [
-      { label: "A favor",   data: matches.map((m) => m.cornersFor),     backgroundColor: "rgba(15,32,63,0.75)", borderRadius: 4 },
-      { label: "En contra", data: matches.map((m) => m.cornersAgainst), backgroundColor: "rgba(220,38,38,0.55)", borderRadius: 4 },
+      { label: "A favor",   data: matches.map((m) => m.cornersFor ?? 0),     backgroundColor: "rgba(15,32,63,0.75)", borderRadius: 4 },
+      { label: "En contra", data: matches.map((m) => m.cornersAgainst ?? 0), backgroundColor: "rgba(220,38,38,0.55)", borderRadius: 4 },
     ]
   );
 
-  // Yellow cards per match
   state.charts.cards = makeBar(
     document.getElementById("chartCards"),
     labels,
@@ -325,24 +334,19 @@ function renderCharts(matches, seasonStats) {
     ]
   );
 
-  // Season totals radar-style bar
   const m = seasonStats.matches || 1;
   state.charts.season = new Chart(document.getElementById("chartSeason"), {
     type: "bar",
     data: {
-      labels: ["Goles F.", "Goles C.", "Corners F.", "Corners C.", "Amarillas"],
+      labels: ["Goles F.", "Goles C.", "Amarillas"],
       datasets: [{
         label: "Promedio / partido",
         data: [
-          parseFloat(avg(seasonStats.goalsFor, m)),
-          parseFloat(avg(seasonStats.goalsAgainst, m)),
-          parseFloat(avg(seasonStats.cornersFor, m)),
-          parseFloat(avg(seasonStats.cornersAgainst, m)),
-          parseFloat(avg(seasonStats.yellowCards, m)),
+          parseFloat(avg(seasonStats.goalsFor, m)) || 0,
+          parseFloat(avg(seasonStats.goalsAgainst, m)) || 0,
+          parseFloat(avg(seasonStats.yellowCards, m)) || 0,
         ],
         backgroundColor: [
-          "rgba(15,32,63,0.75)",
-          "rgba(220,38,38,0.55)",
           "rgba(15,32,63,0.75)",
           "rgba(220,38,38,0.55)",
           "rgba(217,119,6,0.7)",
@@ -357,7 +361,6 @@ function renderCharts(matches, seasonStats) {
   });
 }
 
-/* ── Utils ───────────────────────────────────────────── */
 function addOption(select, value, label, disabled = false, selected = false) {
   const option = document.createElement("option");
   option.value = value;
