@@ -368,3 +368,289 @@ function addOption(select, value, label, disabled = false, selected = false) {
 }
 
 init();
+
+/* ─────────────────────────────────────────────
+   Override cálculo stats desde partidos reales
+───────────────────────────────────────────── */
+function computeStatsFromMatches(matches, seasonStats) {
+  if (!matches.length) {
+    return {
+      matches: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      cornersFor: 0,
+      cornersAgainst: 0,
+      yellowCards: 0,
+      fouls: 0,
+    };
+  }
+
+  return {
+    matches: matches.length,
+    goalsFor: matches.reduce((sum, m) => sum + Number(m.goalsFor || 0), 0),
+    goalsAgainst: matches.reduce((sum, m) => sum + Number(m.goalsAgainst || 0), 0),
+    cornersFor: matches.reduce((sum, m) => sum + Number(m.cornersFor || 0), 0),
+    cornersAgainst: matches.reduce((sum, m) => sum + Number(m.cornersAgainst || 0), 0),
+    yellowCards: matches.reduce((sum, m) => sum + Number(m.yellowCards || 0), 0),
+    fouls: matches.reduce((sum, m) => sum + Number(m.fouls || 0), 0),
+  };
+}
+
+/* ─────────────────────────────────────────────
+   Override últimos 5 partidos para gráficas/tabla
+───────────────────────────────────────────── */
+async function renderStats() {
+  const payload = await window.StatBetData.api.getTeamStats(state.teamId, state.context, state.competition);
+  if (!payload) return;
+
+  const filteredMatches = filterMatchesByDateRange(payload.recentMatches);
+  const computedStats = computeStatsFromMatches(filteredMatches, payload.sourceStats);
+  const lastFiveMatches = filteredMatches.slice(0, 5);
+
+  renderKpis(computedStats, payload.updatedAt);
+  renderRecentMatches(lastFiveMatches);
+  renderMeta(payload.teamName);
+  renderCharts(lastFiveMatches, computedStats);
+}
+
+function renderRecentMatches(matches) {
+  sel.recentMatches.innerHTML = "";
+
+  if (!matches.length) {
+    const row = document.createElement("tr");
+    row.className = "empty-row";
+    row.innerHTML = '<td colspan="9">No hay partidos para los filtros seleccionados.</td>';
+    sel.recentMatches.appendChild(row);
+    return;
+  }
+
+  matches.forEach((match) => {
+    const result = getResult(match.goalsFor, match.goalsAgainst);
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${match.date}</td>
+      <td>${match.competition}</td>
+      <td><strong>${match.opponent}</strong></td>
+      <td><span class="context-pill context-pill--${match.homeAway}">${match.homeAway === "home" ? "Local" : "Visitante"}</span></td>
+      <td><span class="result-badge result-badge--${result}">${result}</span></td>
+      <td class="score-cell">${match.score}</td>
+      <td>${match.goalsFor}–${match.goalsAgainst}</td>
+      <td>${match.cornersFor}–${match.cornersAgainst}</td>
+      <td>${match.yellowCards}</td>
+    `;
+    sel.recentMatches.appendChild(row);
+  });
+}
+
+function renderCharts(matches, seasonStats) {
+  destroyCharts();
+
+  const labels = matches.length
+    ? matches.map((m) => m.opponent.length > 10 ? m.opponent.slice(0, 10) + "…" : m.opponent)
+    : [];
+
+  state.charts.goals = makeBar(
+    document.getElementById("chartGoals"),
+    labels,
+    [
+      { label: "A favor", data: matches.map((m) => m.goalsFor), backgroundColor: "rgba(15,32,63,0.75)", borderRadius: 4 },
+      { label: "En contra", data: matches.map((m) => m.goalsAgainst), backgroundColor: "rgba(220,38,38,0.55)", borderRadius: 4 },
+    ]
+  );
+
+  state.charts.corners = makeBar(
+    document.getElementById("chartCorners"),
+    labels,
+    [
+      { label: "A favor", data: matches.map((m) => m.cornersFor), backgroundColor: "rgba(15,32,63,0.75)", borderRadius: 4 },
+      { label: "En contra", data: matches.map((m) => m.cornersAgainst), backgroundColor: "rgba(220,38,38,0.55)", borderRadius: 4 },
+    ]
+  );
+
+  state.charts.cards = makeBar(
+    document.getElementById("chartCards"),
+    labels,
+    [
+      { label: "Amarillas", data: matches.map((m) => m.yellowCards), backgroundColor: "rgba(217,119,6,0.75)", borderRadius: 4 },
+    ]
+  );
+
+  const m = seasonStats.matches || 1;
+
+  state.charts.season = new Chart(document.getElementById("chartSeason"), {
+    type: "bar",
+    data: {
+      labels: ["Goles F.", "Goles C.", "Corners F.", "Corners C.", "Amarillas"],
+      datasets: [{
+        label: "Promedio / partido",
+        data: [
+          parseFloat(avg(seasonStats.goalsFor, m)),
+          parseFloat(avg(seasonStats.goalsAgainst, m)),
+          parseFloat(avg(seasonStats.cornersFor, m)),
+          parseFloat(avg(seasonStats.cornersAgainst, m)),
+          parseFloat(avg(seasonStats.yellowCards, m)),
+        ],
+        backgroundColor: [
+          "rgba(15,32,63,0.75)",
+          "rgba(220,38,38,0.55)",
+          "rgba(15,32,63,0.75)",
+          "rgba(220,38,38,0.55)",
+          "rgba(217,119,6,0.7)",
+        ],
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      maintainAspectRatio: false,
+      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } },
+    },
+  });
+
+  Object.values(state.charts).forEach((chart) => {
+    if (chart) chart.resize();
+  });
+}
+
+/* ─────────────────────────────────────────────
+   FIX DEFINITIVO: renderCharts sin crecimiento infinito
+───────────────────────────────────────────── */
+function renderCharts(matches, seasonStats) {
+  destroyCharts();
+
+  const lastFive = matches.slice(0, 5);
+
+  const labels = lastFive.length
+    ? lastFive.map((m) => m.opponent.length > 10 ? m.opponent.slice(0, 10) + "…" : m.opponent)
+    : [];
+
+  const fixedOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 2,
+    plugins: {
+      legend: {
+        display: true,
+        position: "bottom",
+        labels: {
+          font: { size: 11, family: "Manrope" },
+          boxWidth: 12,
+          padding: 12,
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: {
+          font: { size: 10, family: "Manrope" },
+          maxRotation: 30,
+        },
+      },
+      y: {
+        grid: { color: "#f0f2f5" },
+        ticks: {
+          font: { size: 10, family: "Manrope" },
+          stepSize: 1,
+        },
+        beginAtZero: true,
+      },
+    },
+  };
+
+  state.charts.goals = new Chart(document.getElementById("chartGoals"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "A favor",
+          data: lastFive.map((m) => m.goalsFor),
+          backgroundColor: "rgba(15,32,63,0.75)",
+          borderRadius: 4,
+        },
+        {
+          label: "En contra",
+          data: lastFive.map((m) => m.goalsAgainst),
+          backgroundColor: "rgba(220,38,38,0.55)",
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: fixedOptions,
+  });
+
+  state.charts.corners = new Chart(document.getElementById("chartCorners"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "A favor",
+          data: lastFive.map((m) => m.cornersFor),
+          backgroundColor: "rgba(15,32,63,0.75)",
+          borderRadius: 4,
+        },
+        {
+          label: "En contra",
+          data: lastFive.map((m) => m.cornersAgainst),
+          backgroundColor: "rgba(220,38,38,0.55)",
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: fixedOptions,
+  });
+
+  state.charts.cards = new Chart(document.getElementById("chartCards"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Amarillas",
+          data: lastFive.map((m) => m.yellowCards),
+          backgroundColor: "rgba(217,119,6,0.75)",
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: fixedOptions,
+  });
+
+  const totalMatches = seasonStats.matches || 1;
+
+  state.charts.season = new Chart(document.getElementById("chartSeason"), {
+    type: "bar",
+    data: {
+      labels: ["Goles F.", "Goles C.", "Corners F.", "Corners C.", "Amarillas"],
+      datasets: [
+        {
+          label: "Promedio / partido",
+          data: [
+            parseFloat(avg(seasonStats.goalsFor, totalMatches)),
+            parseFloat(avg(seasonStats.goalsAgainst, totalMatches)),
+            parseFloat(avg(seasonStats.cornersFor, totalMatches)),
+            parseFloat(avg(seasonStats.cornersAgainst, totalMatches)),
+            parseFloat(avg(seasonStats.yellowCards, totalMatches)),
+          ],
+          backgroundColor: [
+            "rgba(15,32,63,0.75)",
+            "rgba(220,38,38,0.55)",
+            "rgba(15,32,63,0.75)",
+            "rgba(220,38,38,0.55)",
+            "rgba(217,119,6,0.7)",
+          ],
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      ...fixedOptions,
+      plugins: {
+        ...fixedOptions.plugins,
+        legend: { display: false },
+      },
+    },
+  });
+}

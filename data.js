@@ -561,3 +561,131 @@
     };
   }
 })();
+
+/* ─────────────────────────────────────────────
+   Override BD local StatBet
+   Usa MySQL mediante backend/statbet_api.php
+───────────────────────────────────────────── */
+(function () {
+  if (!window.StatBetData || !window.StatBetData.api) return;
+
+  const originalApi = window.StatBetData.api;
+
+  const leagueToDivision = {
+    premier: "E0",
+    championship: "E1",
+    la_liga: "SP1",
+    laliga2: "SP2",
+    serie_a: "I1",
+    serie_b: "I2",
+  };
+
+  const divisionToCountry = {
+    E0: "GB",
+    E1: "GB",
+    SP1: "ES",
+    SP2: "ES",
+    I1: "IT",
+    I2: "IT",
+  };
+
+  function normalizeId(value) {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "");
+  }
+
+  async function fetchJson(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  }
+
+  originalApi.getTeamsByLeague = async function (leagueId) {
+    const division = leagueToDivision[leagueId];
+
+    if (!division) {
+      return [];
+    }
+
+    try {
+      const json = await fetchJson(`backend/statbet_api.php?action=teams&division=${encodeURIComponent(division)}`);
+
+      if (!json.ok || !Array.isArray(json.teams)) {
+        return [];
+      }
+
+      return json.teams.map((item) => ({
+        id: normalizeId(item.team_name),
+        name: item.team_name,
+        leagueId,
+        countryCode: divisionToCountry[division] || "",
+        icon: "",
+      }));
+    } catch (e) {
+      console.error("Error cargando equipos desde BD:", e);
+      return [];
+    }
+  };
+
+  originalApi.getTeamById = async function (teamId) {
+    const original = await originalApi.__originalGetTeamById?.(teamId);
+
+    if (original) {
+      return original;
+    }
+
+    return {
+      id: teamId,
+      name: String(teamId || "").replace(/-/g, " "),
+      leagueId: "",
+      countryCode: "",
+      icon: "",
+    };
+  };
+
+  originalApi.getTeamStats = async function (teamId, context = "all", competition = "all") {
+    try {
+      const url =
+        `backend/statbet_api.php?action=teamStats` +
+        `&team=${encodeURIComponent(teamId)}` +
+        `&context=${encodeURIComponent(context)}` +
+        `&competition=${encodeURIComponent(competition)}`;
+
+      const json = await fetchJson(url);
+
+      if (json.ok) {
+        return json;
+      }
+
+      console.warn("La BD no encontró estadísticas:", json);
+    } catch (e) {
+      console.error("Error cargando stats desde BD:", e);
+    }
+
+    return {
+      teamName: teamId,
+      sourceStats: {
+        matches: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        cornersFor: 0,
+        cornersAgainst: 0,
+        yellowCards: 0,
+        fouls: 0,
+      },
+      recentMatches: [],
+      updatedAt: new Date().toISOString(),
+      competitions: [],
+    };
+  };
+
+  if (!originalApi.__originalGetTeamById) {
+    originalApi.__originalGetTeamById = async function (teamId) {
+      const dbTeam = await originalApi.searchTeam(String(teamId));
+      return dbTeam || null;
+    };
+  }
+})();
