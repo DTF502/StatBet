@@ -5,6 +5,7 @@ const state = {
   context: "all",
   competition: "all",
   dateRange: "all",
+  visibleMatches: 5,
   dateStart: null,
   dateEnd: null,
   charts: {},
@@ -165,18 +166,6 @@ async function populateCompetitionFilter() {
 }
 
 /* ── Render ──────────────────────────────────────────── */
-async function renderStats() {
-  const payload = await window.StatBetData.api.getTeamStats(state.teamId, state.context, state.competition);
-  if (!payload) return;
-
-  const filteredMatches = filterMatchesByDateRange(payload.recentMatches);
-  const computedStats = computeStatsFromMatches(filteredMatches, payload.sourceStats);
-
-  renderKpis(computedStats, payload.updatedAt);
-  renderRecentMatches(filteredMatches);
-  renderMeta(payload.teamName);
-  renderCharts(filteredMatches, computedStats);
-}
 
 function filterMatchesByDateRange(matches) {
   if (state.dateRange === "all") return matches;
@@ -404,13 +393,15 @@ async function renderStats() {
   if (!payload) return;
 
   const filteredMatches = filterMatchesByDateRange(payload.recentMatches);
-  const computedStats = computeStatsFromMatches(filteredMatches, payload.sourceStats);
-  const lastFiveMatches = filteredMatches.slice(0, 5);
+  state._allMatches = filteredMatches;
+  state.visibleMatches = 5;
 
+  const computedStats = computeStatsFromMatches(filteredMatches, payload.sourceStats);
   renderKpis(computedStats, payload.updatedAt);
-  renderRecentMatches(lastFiveMatches);
+  renderRecentMatches(filteredMatches.slice(0, state.visibleMatches));
   renderMeta(payload.teamName);
-  renderCharts(lastFiveMatches, computedStats);
+  renderCharts(filteredMatches.slice(0, 5), computedStats);
+  updateLoadMoreBtn();
 }
 
 function renderRecentMatches(matches) {
@@ -654,3 +645,16 @@ function renderCharts(matches, seasonStats) {
     },
   });
 }
+function updateLoadMoreBtn() {
+  const btn = document.getElementById("loadMoreBtn");
+  if (!btn) return;
+  const total = (state._allMatches || []).length;
+  btn.style.display = state.visibleMatches >= total ? "none" : "inline-block";
+}
+
+document.getElementById("loadMoreBtn")?.addEventListener("click", () => {
+  state.visibleMatches += 5;
+  const matches = (state._allMatches || []).slice(0, state.visibleMatches);
+  renderRecentMatches(matches);
+  updateLoadMoreBtn();
+});
