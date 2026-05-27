@@ -17,39 +17,40 @@ try {
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         exit;
     }
+if ($action === 'teams') {
+    $division = $_GET['division'] ?? 'all';
 
-    if ($action === 'teams') {
-        $division = $_GET['division'] ?? 'all';
-
-        if ($division !== 'all') {
-            $stmt = $pdo->prepare("
-                SELECT DISTINCT team_name
-                FROM (
-                    SELECT home_team AS team_name FROM matches WHERE division_code = ?
-                    UNION
-                    SELECT away_team AS team_name FROM matches WHERE division_code = ?
-                ) t
-                ORDER BY team_name
-            ");
-            $stmt->execute([$division, $division]);
-        } else {
-            $stmt = $pdo->query("
-                SELECT DISTINCT team_name
-                FROM (
-                    SELECT home_team AS team_name FROM matches
-                    UNION
-                    SELECT away_team AS team_name FROM matches
-                ) t
-                ORDER BY team_name
-            ");
-        }
-
-        echo json_encode([
-            'ok' => true,
-            'teams' => $stmt->fetchAll()
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        exit;
+    if ($division !== 'all') {
+      $stmt = $pdo->prepare("
+    SELECT DISTINCT m.team_name, COALESCE(t.icon_path, '') AS icon_path
+    FROM (
+        SELECT home_team AS team_name FROM matches WHERE division_code = ?
+        UNION
+        SELECT away_team AS team_name FROM matches WHERE division_code = ?
+    ) m
+    LEFT JOIN teams t ON t.team_name = m.team_name
+    ORDER BY m.team_name
+");
+        $stmt->execute([$division, $division]);
+    } else {
+        $stmt = $pdo->query("
+    SELECT DISTINCT m.team_name, COALESCE(t.icon_path, '') AS icon_path
+    FROM (
+        SELECT home_team AS team_name FROM matches
+        UNION
+        SELECT away_team AS team_name FROM matches
+    ) m
+    LEFT JOIN teams t ON t.team_name = m.team_name
+    ORDER BY m.team_name
+");
     }
+
+    echo json_encode([
+        'ok' => true,
+        'teams' => $stmt->fetchAll()
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
     if ($action === 'teamStats') {
         $teamParam = trim($_GET['team'] ?? '');
@@ -169,6 +170,76 @@ try {
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if ($action === 'teamById') {
+    $teamParam = trim($_GET['team'] ?? '');
+    if ($teamParam === '') {
+        echo json_encode(['ok' => false, 'error' => 'Falta el parámetro team']);
+        exit;
+    }
+
+    $teamName = resolveTeamName($pdo, $teamParam);
+
+    if (!$teamName) {
+        echo json_encode(['ok' => false, 'error' => 'Equipo no encontrado']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("SELECT icon_path FROM teams WHERE team_name = ? LIMIT 1");
+    $stmt->execute([$teamName]);
+    $row = $stmt->fetch();
+
+    echo json_encode([
+        'ok' => true,
+        'team' => [
+            'id'          => $teamParam,
+            'name'        => $teamName,
+            'icon'        => $row ? $row['icon_path'] : '',
+            'leagueId'    => '',
+            'countryCode' => '',
+        ]
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if ($action === 'searchTeam') {
+    $query = trim($_GET['q'] ?? '');
+    if ($query === '') {
+        echo json_encode(['ok' => false, 'error' => 'Falta el parámetro q']);
+        exit;
+    }
+
+    $teamName = resolveTeamName($pdo, $query);
+
+    if (!$teamName) {
+        echo json_encode(['ok' => false, 'team' => null]);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("SELECT icon_path FROM teams WHERE team_name = ? LIMIT 1");
+    $stmt->execute([$teamName]);
+    $row = $stmt->fetch();
+
+    // Buscar en qué división y país está
+    $divStmt = $pdo->prepare("
+        SELECT division_code FROM matches 
+        WHERE home_team = ? OR away_team = ? 
+        LIMIT 1
+    ");
+    $divStmt->execute([$teamName, $teamName]);
+    $divRow = $divStmt->fetch();
+
+    echo json_encode([
+        'ok' => true,
+        'team' => [
+            'id'          => strtolower(preg_replace('/[^a-z0-9]/i', '', iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $teamName))),
+            'name'        => $teamName,
+            'icon'        => $row ? $row['icon_path'] : '',
+            'leagueId'    => '',
+            'countryCode' => '',
+            'divisionCode'=> $divRow ? $divRow['division_code'] : '',
+        ]
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
     throw new RuntimeException('Acción no reconocida: ' . $action);
 

@@ -479,3 +479,4 @@ echo "all-euro-data-2025-2026.xlsx -> importados: $xlsxImported | saltados: $xls
 $total = $pdo->query('SELECT COUNT(*) AS total FROM matches')->fetch()['total'];
 echo "TOTAL EN BD matches: $total\n";
 echo "Importación terminada.\n";
+

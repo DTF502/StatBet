@@ -127,15 +127,7 @@ async function onTeamSearch() {
     return;
   }
 
-  setSelectValue(controls.country, match.countryCode);
-  await onCountryChange();
-
-  setSelectValue(controls.league, match.leagueId);
-  await onLeagueChange();
-
-  setSelectValue(controls.team, match.id);
-  state.selected.team = match.id;
-  selectors.viewStatsBtn.disabled = false;
+  window.location.href = `stats.html?team=${encodeURIComponent(match.id)}`;
 }
 
 function goToStatsPage() {
