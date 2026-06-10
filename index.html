@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StatBet - Estadísticas de Apuestas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;1,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="home-page">
+  <header class="topbar">
+    <div class="brand-wrap">
+      <span class="brand">STATBET</span>
+      <span class="brand-subtitle">Inteligencia para apuestas deportivas</span>
+    </div>
+
+    <div class="topbar-search">
+      <input id="teamSearch" type="text" placeholder="Buscar equipo..." aria-label="Buscar equipo" />
+      <button id="teamSearchBtn" type="button">Buscar</button>
+      <button id="updateBtn" type="button" onclick="runUpdate()"> Actualizar datos</button>
+    </div>
+  </header>
+
+  <main class="home-main">
+    <section class="selection-panel" aria-label="Panel de selección inicial">
+      <h1>Selecciona un equipo</h1>
+
+      <div class="selection-row">
+        <div class="field compact">
+          <label>País</label>
+          <div id="countrySelect" class="image-select" aria-label="Seleccionar país"></div>
+        </div>
+
+        <div class="field compact">
+          <label>Liga</label>
+          <div id="leagueSelect" class="image-select is-disabled" aria-label="Seleccionar liga"></div>
+        </div>
+
+        <div class="field compact">
+          <label>Equipo</label>
+          <div id="teamSelect" class="image-select is-disabled" aria-label="Seleccionar equipo"></div>
+        </div>
+
+        <button id="viewStatsBtn" class="primary-btn" type="button" disabled>Ver estadísticas →</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script src="update.js"></script>
+</body>
+</html>

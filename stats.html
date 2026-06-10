@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StatBet - Estadísticas del Equipo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;1,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="stats-page">
+  <header class="topbar">
+    <div class="brand-wrap">
+      <a class="brand" href="index.html">STATBET</a>
+      <span class="brand-subtitle">Vista detallada del equipo seleccionado</span>
+    </div>
+    <a class="back-link" href="index.html">← Cambiar equipo</a>
+  </header>
+
+  <main class="stats-main">
+    <section class="stats-area" aria-live="polite">
+
+      <!-- Cabecera del equipo -->
+      <div class="team-header">
+        <img id="teamLogo" class="team-header__logo hidden" src="" alt="" />
+        <div class="team-header__logo-placeholder hidden" id="teamLogoPlaceholder"></div>
+        <div class="team-header__info">
+          <h1 class="team-header__name" id="teamTitle">Estadísticas del equipo</h1>
+          <p class="team-header__meta" id="statsMeta">General | Todas las competiciones</p>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="filters-box">
+        <div class="post-filters">
+          <div class="field compact">
+            <label for="dateRangeSelect">Período</label>
+            <select id="dateRangeSelect" aria-label="Seleccionar período">
+              <option value="all">Todos los partidos</option>
+              <option value="week">Última semana</option>
+              <option value="month">Último mes</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </div>
+          <div class="field compact">
+            <label for="homeAwaySelect">Contexto</label>
+            <select id="homeAwaySelect" aria-label="Filtrar por contexto">
+              <option value="all">General</option>
+              <option value="home">Local</option>
+              <option value="away">Visitante</option>
+            </select>
+          </div>
+          <div class="field compact">
+            <label for="competitionSelect">Competición</label>
+            <select id="competitionSelect" aria-label="Filtrar por competición"></select>
+          </div>
+        </div>
+
+        <!-- Date Range Picker (hidden by default) -->
+        <div class="date-range-picker hidden" id="dateRangePicker">
+          <div class="date-range-picker__group">
+            <div class="field compact">
+              <label for="dateStart">Desde</label>
+              <input type="date" id="dateStart" aria-label="Fecha de inicio" />
+            </div>
+            <div class="field compact">
+              <label for="dateEnd">Hasta</label>
+              <input type="date" id="dateEnd" aria-label="Fecha de fin" />
+            </div>
+          </div>
+          <div class="date-error hidden" id="dateError">La fecha final no puede ser anterior a la inicial</div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi">
+          <div class="kpi__label">Partidos</div>
+          <div class="kpi__total" id="statMatches">0</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Goles a favor</div>
+          <div class="kpi__total" id="statGoalsFor">0</div>
+          <div class="kpi__avg" id="avgGoalsFor">– / partido</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Goles en contra</div>
+          <div class="kpi__total" id="statGoalsAgainst">0</div>
+          <div class="kpi__avg" id="avgGoalsAgainst">– / partido</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Corners a favor</div>
+          <div class="kpi__total" id="statCornersFor">0</div>
+          <div class="kpi__avg" id="avgCornersFor">– / partido</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Corners en contra</div>
+          <div class="kpi__total" id="statCornersAgainst">0</div>
+          <div class="kpi__avg" id="avgCornersAgainst">– / partido</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Tarjetas amarillas</div>
+          <div class="kpi__total" id="statYellowCards">0</div>
+          <div class="kpi__avg" id="avgYellowCards">– / partido</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Faltas</div>
+          <div class="kpi__total" id="statFouls">0</div>
+          <div class="kpi__avg" id="avgFouls">– / partido</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Actualizado</div>
+          <div class="kpi__total" style="font-size:1rem" id="statUpdatedAt">--:--</div>
+        </div>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Goles por partido (últimos 5)</h3>
+          <canvas id="chartGoals" height="160"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Corners por partido (últimos 5)</h3>
+          <canvas id="chartCorners" height="160"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Amarillas por partido (últimos 5)</h3>
+          <canvas id="chartCards" height="160"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Totales de temporada</h3>
+          <canvas id="chartSeason" height="160"></canvas>
+        </div>
+      </div>
+
+      <!-- Últimos partidos -->
+      <article class="table-card">
+        <div class="table-card__header">
+          <h2>Últimos partidos</h2>
+        </div>
+        <table class="recent-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Comp.</th>
+              <th>Rival</th>
+              <th>Cond.</th>
+              <th>Resultado</th>
+              <th>Marcador</th>
+              <th>Goles</th>
+              <th>Corners</th>
+              <th>Amr.</th>
+            </tr>
+          </thead>
+          <tbody id="recentMatches"></tbody>
+        </table>
+        <div style="text-align:center; margin-top:1rem;">
+  <button id="loadMoreBtn" type="button" class="primary-btn">Ver más partidos</button>
+</div>
+      </article>
+
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="data.js"></script>
+  <script src="stats.js"></script>
+</body>
+</html>
